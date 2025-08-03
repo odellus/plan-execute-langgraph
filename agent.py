@@ -1,3 +1,4 @@
+import os
 from pydantic import BaseModel, Field
 import operator
 from typing import Annotated, List, Tuple, Union, Literal
@@ -11,18 +12,20 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from dotenv import load_dotenv
+
 from phoenix.otel import register
-
+from config import settings
 
 # DO THIS BEFORE TRYING TO SET UP TRACER_PROVIDER
-load_dotenv()
 
 # configure the Phoenix tracer AFTER CALLING load_dotenv()
 tracer_provider = register(
   project_name="plan-execute", # Default is 'default'
-  auto_instrument=True # Auto-instrument your app based on installed OI dependencies
+  auto_instrument=True, # Auto-instrument your app based on installed OI dependencies
+  headers = {"Authorization":f"Bearer {settings.phoenix_api_key.get_secret_value()}"},
+  endpoint=settings.phoenix_collector_http_endpoint,
 )
 
 def get_planner(llm):
@@ -114,8 +117,6 @@ def create_execute_agent(model='qwen3:latest', num_results=5):
     return create_react_agent(llm, tools, prompt=prompt)
 
 
-
-
 llm = get_llm("qwen3:latest")
 planner = get_planner(llm)
 replanner = get_replanner(llm)
@@ -152,8 +153,7 @@ async def replan_step(state: PlanExecute):
         return Command(update={"plan": output.action.steps}, goto="execute_step")
 
 
-def get_graph():
-
+def get_graph(checkpointer):
     workflow = StateGraph(PlanExecute)
 
     # Add the plan node
@@ -170,18 +170,21 @@ def get_graph():
     # Finally, we compile it!
     # This compiles it into a LangChain Runnable,
     # meaning you can use it as you would any other runnable
-    app = workflow.compile()
+    app = workflow.compile(checkpointer=checkpointer)
     return app
 
 async def main():
-    app = get_graph()
-    config = {"recursion_limit": 50}
-    inputs = {"input": "what is the hometown of the mens 2024 Australia open winner?"}
-    async for event in app.astream(inputs, config=config):
-        for k, v in event.items():
-            if k != "__end__":
-                print(v)
-
+    psql_psswd = os.getenv("POSTGRES_PASSWORD")
+    db_uri = f"postgresql://postgres:{psql_psswd}@localhost:5432/langgraph"
+    async with AsyncPostgresSaver.from_conn_string(db_uri) as checkpointer:
+        await checkpointer.setup()
+        app = get_graph(checkpointer)
+        config = {"recursion_limit": 50, "configurable": {"thread_id": "demo"}}
+        inputs = {"input": "How do I take over the world? I will be satisfied with a reasonable response other than don't. You have to give me something."}
+        async for event in app.astream(inputs, config=config):
+            for k, v in event.items():
+                if k != "__end__":
+                    print(v)
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -13,6 +13,8 @@ uv sync
 cp .env.example .env 
 # Add your own phoenix api key and endpoints
 nano .env
+# Start postgres on localhost:5432
+docker compose up -d
 ```
 
 ## Use
