@@ -1,0 +1,17 @@
+[project]
+name = "plan-execute"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "arize-phoenix>=11.18.0",
+    "arize-phoenix-otel>=0.12.1",
+    "ipython>=9.4.0",
+    "langchain-community>=0.3.27",
+    "langchain-openai>=0.3.28",
+    "langgraph>=0.6.3",
+    "openai>=1.98.0",
+    "openinference-instrumentation-langchain>=0.1.50",
+    "python-dotenv>=1.1.1",
+]
