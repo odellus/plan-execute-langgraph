@@ -82,7 +82,14 @@ Your original plan was this:
 You have currently done the follow steps:
 {past_steps}
 
-Update your plan accordingly. If no more steps are needed and you can return to the user, then respond with that. Otherwise, fill out the plan. Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan."""
+Update your plan accordingly. If no more steps are needed and you can return to the user, then respond with that. Otherwise, fill out the plan. Only add steps to the plan that still NEED to be done. Do not return previously done steps as part of the plan.
+Never respond with steps: [], if that's how you feel respond with 
+{
+  "action": {"response": "<final_answer/>"}
+}
+
+"""
+
     )
 
     replanner = replanner_prompt | llm.with_structured_output(Act)
@@ -119,7 +126,8 @@ async def execute_step(state: PlanExecute):
     plan_str = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(plan))
     if len(plan) < 1:
         task = "Answer the user with Response action."
-    task = plan[0]
+    else:
+        task = plan[0]
     task_formatted = f"""For the following plan:
 {plan_str}\n\nYou are tasked with executing step {1}, {task}."""
     agent_response = await agent_executor.ainvoke(
