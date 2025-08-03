@@ -10,6 +10,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.graph import StateGraph, START, END
+from langgraph.types import Command
 
 from dotenv import load_dotenv
 from phoenix.otel import register
@@ -132,57 +133,39 @@ async def execute_step(state: PlanExecute):
     agent_response = await agent_executor.ainvoke(
         {"messages": [("user", task_formatted)]}
     )
-    return {
-        "past_steps": [(task, agent_response["messages"][-1].content)],
-    }
+    return Command(
+        update={"past_steps": [(task, agent_response["messages"][-1].content)]},
+        goto="replan_step",
+    )
 
 
 async def plan_step(state: PlanExecute):
     plan = await planner.ainvoke({"messages": [("user", state["input"])]})
-    return {"plan": plan.steps}
+    return Command(update={"plan": plan.steps}, goto="execute_step")
 
 
 async def replan_step(state: PlanExecute):
     output = await replanner.ainvoke(state)
     if isinstance(output.action, Response):
-        return {"response": output.action.response}
+        return Command(update={"response": output.action.response}, goto=END)
     else:
-        return {"plan": output.action.steps}
+        return Command(update={"plan": output.action.steps}, goto="execute_step")
 
-
-def should_end(state: PlanExecute):
-    if "response" in state and state["response"]:
-        return END
-    else:
-        return "agent"
 
 def get_graph():
 
     workflow = StateGraph(PlanExecute)
 
     # Add the plan node
-    workflow.add_node("planner", plan_step)
+    workflow.add_node("plan_step", plan_step)
 
     # Add the execution step
-    workflow.add_node("agent", execute_step)
+    workflow.add_node("execute_step", execute_step)
 
     # Add a replan node
-    workflow.add_node("replan", replan_step)
+    workflow.add_node("replan_step", replan_step)
 
-    workflow.add_edge(START, "planner")
-
-    # From plan we go to agent
-    workflow.add_edge("planner", "agent")
-
-    # From agent, we replan
-    workflow.add_edge("agent", "replan")
-
-    workflow.add_conditional_edges(
-        "replan",
-        # Next, we pass in the function that will determine which node is called next.
-        should_end,
-        ["agent", END],
-    )
+    workflow.add_edge(START, "plan_step")
 
     # Finally, we compile it!
     # This compiles it into a LangChain Runnable,
