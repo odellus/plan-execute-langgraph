@@ -55,7 +55,10 @@ class Plan(BaseModel):
 
 class Response(BaseModel):
     """Response to user."""
-    response: str
+    response: str = Field(
+        description="The final response to the user's query."
+        "Only use when you have the answer.",
+    )
 
 
 class Act(BaseModel):
