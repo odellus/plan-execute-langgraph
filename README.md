@@ -1,7 +1,7 @@
 # plan-execute-langgraph
 
 > [!NOTE]
-> Just a simple re-write of [this tutorial](https://langchain-ai.lang.chat/langgraph/tutorials/plan-and-execute/plan-and-execute/) to use qwen3 and searxng instrumented with phoenix arize
+> Based on [this tutorial](https://langchain-ai.lang.chat/langgraph/tutorials/plan-and-execute/plan-and-execute/) but we use qwen3 and searxng instrumented with phoenix arize. And we put it behind an API. And we connect it to postgres living in a docker with compose.yaml.
 
 
 ## Install
