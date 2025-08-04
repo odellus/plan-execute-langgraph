@@ -1,3 +1,11 @@
+# pyproject.toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/plan_execute"]
+
 [project]
 name = "plan-execute"
 version = "0.1.0"

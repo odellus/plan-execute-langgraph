@@ -5,8 +5,8 @@ but with the real Postgres checkpointer (no FastAPI, no HTTP).
 """
 
 import asyncio
-from config import settings
-from agent import get_graph
+from plan_execute.config import settings
+from plan_execute import get_graph
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 

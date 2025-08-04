@@ -1576,7 +1576,7 @@ wheels = [
 [[package]]
 name = "plan-execute"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "arize-phoenix" },
     { name = "arize-phoenix-otel" },

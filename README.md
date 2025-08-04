@@ -21,7 +21,7 @@ docker compose up -d
 To execute the graph
 
 ```bash
-uv run main.py
+uv run app.py
 ```
 
 ## Monitor 
