@@ -66,15 +66,15 @@ When you are done return with a act.response, not a act.steps please.
     return replanner
 
 def get_searxng_tool(num_results=3):
-    wrapper = SearxSearchWrapper(searx_host="http://localhost:8082")
+    wrapper = SearxSearchWrapper(searx_host=f"{settings.searxng_host}:{settings.searxng_port}")
     return SearxSearchResults(wrapper=wrapper, num_results=num_results)
     
 
 def get_llm(model):
     return ChatOpenAI(
         model=model,
-        base_url='http://localhost:11434/v1', 
-        api_key='ollama',
+        base_url=settings.openai_base_url, 
+        api_key=settings.openai_api_key.get_secret_value(),
     )
 
 def create_execute_agent(model='qwen3:latest', num_results=5):

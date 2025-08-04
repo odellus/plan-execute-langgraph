@@ -8,7 +8,7 @@ import httpx
 from plan_execute.config import settings
 
 async def chat(message: str, thread_id: str = "test") -> str:
-    url = f"http://{settings.host}:{settings.port}/chat"
+    url = f"http://localhost:{settings.port}/chat"
     payload = {"message": message, "thread_id": thread_id}
     async with httpx.AsyncClient(timeout=600) as client:
         r = await client.post(url, json=payload)
@@ -18,7 +18,7 @@ async def chat(message: str, thread_id: str = "test") -> str:
 
 async def main():
     try:
-        answer = await chat("Look on wikipedia for the hometown of the winner of the 1997 NBA MVP Award?", thread_id="12347")
+        answer = await chat("Look on wikipedia for the hometown of the winner of the 1997 NBA MVP Award?", thread_id="12349")
         print("🤖", answer)
     except Exception as e:
         print("❌", e)

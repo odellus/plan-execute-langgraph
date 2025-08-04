@@ -11,9 +11,23 @@ services:
       - "5432:5432"
     volumes:
       - ./postgres:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./init-db/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    
 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       retries: 5
+  
+  plan-execute:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "${PORT}:${PORT}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

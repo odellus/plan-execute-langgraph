@@ -18,11 +18,14 @@ docker compose up -d
 ```
 
 ## Use
-To execute the graph
+To run the server
 
 ```bash
-uv run app.py
+uv run -m plan_execute.app
 ```
+
+## Test
+`tests/unit.py` is broken right now. Use `tests/client.py` after spinning up server in another terminal with `uv run -m plan_execute.app`.
 
 ## Monitor 
 I assume you have arize phoenix running and have set an API key. If you haven't, [do so](https://github.com/odellus/homelab). If you don't want to commit, just try
