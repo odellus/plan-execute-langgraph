@@ -1,5 +1,4 @@
-import os
-import asyncio
+import traceback
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
@@ -27,7 +26,7 @@ db_uri = settings.postgres_dsn
 async def lifespan(app: FastAPI):
     async with AsyncConnectionPool(db_uri, open=False) as pool:
         service = PlanExecuteService(pool)   # << new service
-        await service.initialise()
+        await service.initialize()
         app.state.executor = service       # << attach to app state
         yield
     # pool closed automatically on exit
@@ -47,7 +46,9 @@ async def chat(req: ChatRequest) -> ChatResponse:
     try:
         return await service.chat(ChatRequest(**req.model_dump()))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        detail = traceback.format_exc()
+        logger.exception("chat endpoint failed")
+        raise HTTPException(status_code=500, detail=detail)
 
 if __name__ == "__main__":
     import uvicorn

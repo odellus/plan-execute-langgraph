@@ -37,7 +37,7 @@ class PlanExecuteService:
 
         return workflow.compile(checkpointer=self.checkpointer)
 
-    async def initialise(self) -> None:
+    async def initialize(self) -> None:
         """One-time DB setup; call once at start-up."""
         await self.checkpointer.setup()
 

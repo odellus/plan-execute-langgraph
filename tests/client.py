@@ -18,7 +18,7 @@ async def chat(message: str, thread_id: str = "test") -> str:
 
 async def main():
     try:
-        answer = await chat("Look on wikipedia for the hometown of the winner of the 1997 NBA MVP Award?", thread_id="12346")
+        answer = await chat("Look on wikipedia for the hometown of the winner of the 1997 NBA MVP Award?", thread_id="12347")
         print("🤖", answer)
     except Exception as e:
         print("❌", e)
