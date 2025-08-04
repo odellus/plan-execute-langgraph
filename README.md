@@ -20,6 +20,9 @@ docker compose up -d db
 # *Optional
 docker compose up -d --build
 ```
+> [!NOTE]
+> Requires local searxng. We recommend using the [searxng-docker](https://github.com/searxng/searxng-docker) yaml
+
 
 ## Use
 To run the server
