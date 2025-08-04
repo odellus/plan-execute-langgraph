@@ -28,6 +28,9 @@ class Response(BaseModel):
 
 class Act(BaseModel):
     """Action to perform."""
+    reasoning: str = Field(
+        description="Extremely brief reasoning of 15-20 words on whether the action needs to be a new Plan or a final Response"
+    )
     action: Union[Response, Plan] = Field(
         description="Action to perform. If you want to respond to user because you have the answer, use Response. "
         "If you need to further use tools to get the answer, use Plan."
