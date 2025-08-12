@@ -12,8 +12,8 @@ def test_simple_chat_stream():
     
     # The request payload
     payload = {
-        "message": "Write an exceedingly dry 2000 word essay on the history of ordoliberalism in post cold war Germany.",
-        "thread_id": "test-stream-122"
+        "message": "Write an exceedingly dry 300 word essay on the history of ordoliberalism in post cold war Germany.",
+        "thread_id": "test-stream-128"
     }
     
     print(f"🚀 Testing streaming chat with message: {payload['message']}")
@@ -61,7 +61,7 @@ def test_simple_chat_stream():
                     else:
                         # Print each chunk with timestamp and flush immediately
                         elapsed = time.time() - start_time
-                        print(f"[{elapsed:6.2f}s] {chunk}", flush=True)
+                        print(f"{chunk}", flush=True, end="")
                         full_response += chunk
                         chunk_count += 1
                         
