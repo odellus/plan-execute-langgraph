@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     postgres_url: str = "db"
     phoenix_api_key: SecretStr
     phoenix_collector_endpoint: str = "http://host.docker.internal:4317"
-    phoenix_collector_http_endpoint: str = "http://host.docker.internal:6006/v1/traces"
+    # phoenix_collector_http_endpoint: str = "http://host.docker.internal:6006/v1/traces"
     openai_base_url: str = "http://host.docker.internal:11434/v1"
     openai_api_key: SecretStr
     searxng_host: str = "http://host.docker.internal"

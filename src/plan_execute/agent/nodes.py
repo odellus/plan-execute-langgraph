@@ -17,10 +17,9 @@ from plan_execute.config import settings
 
 # configure the Phoenix tracer AFTER CALLING load_dotenv()
 tracer_provider = register(
-  project_name="plan-execute", # Default is 'default'
+  project_name="plan-execute-tw", # Default is 'default'
   auto_instrument=True, # Auto-instrument your app based on installed OI dependencies
-  headers = {"Authorization":f"Bearer {settings.phoenix_api_key.get_secret_value()}"},
-  endpoint=settings.phoenix_collector_http_endpoint,
+  protocol="http/protobuf",
 )
 
 def get_planner(llm):
