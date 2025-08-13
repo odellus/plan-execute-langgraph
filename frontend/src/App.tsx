@@ -1,13 +1,13 @@
-import React, { useState, useCallback } from 'react'
+import React from 'react'
 import {
-  AssistantRuntime,
-  ChatModelAdapter,
-  ThreadMessage,
-  TextContentPart,
-  UserMessage,
+  AssistantRuntimeProvider,
+  useLocalRuntime,
+  ThreadPrimitive,
+  ComposerPrimitive,
+  MessagePrimitive,
 } from '@assistant-ui/react'
-import { useChatRuntime } from '@assistant-ui/react'
-import { MarkdownText } from '@assistant-ui/react-markdown'
+import type { ChatModelAdapter } from '@assistant-ui/react'
+
 
 interface ChatRequest {
   message: string
@@ -16,29 +16,28 @@ interface ChatRequest {
 
 // Custom adapter to connect to our backend
 class BackendChatAdapter implements ChatModelAdapter {
-  async run({
-    messages,
-    threadId,
-  }: {
-    messages: ThreadMessage[]
-    threadId?: string
-  }): Promise<AsyncIterable<ThreadMessage>> {
+  async *run(options: any): AsyncGenerator<any, void> {
+    const { messages } = options
+    console.log('🚀 BackendChatAdapter.run called with:', { messages, options })
+    
     const lastMessage = messages[messages.length - 1]
+    console.log('📩 Last message:', lastMessage)
     
     if (lastMessage.role !== 'user') {
       throw new Error('Last message must be from user')
     }
 
-    const userMessage = lastMessage as UserMessage
-    const textContent = userMessage.content[0] as TextContentPart
-    const userText = textContent.text
+    const userText = lastMessage.content[0]?.text || ''
+    console.log('💬 Extracted user text:', userText)
 
     const requestBody: ChatRequest = {
       message: userText,
-      thread_id: threadId || 'default',
+      thread_id: 'default',
     }
+    console.log('📤 Request body:', requestBody)
 
     try {
+      console.log('🌐 Making fetch request to /api/simple-chat-stream')
       const response = await fetch('/api/simple-chat-stream', {
         method: 'POST',
         headers: {
@@ -46,6 +45,8 @@ class BackendChatAdapter implements ChatModelAdapter {
         },
         body: JSON.stringify(requestBody),
       })
+
+      console.log('📡 Response received:', { status: response.status, ok: response.ok })
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -59,193 +60,186 @@ class BackendChatAdapter implements ChatModelAdapter {
       }
 
       let accumulatedContent = ''
+      console.log('🔄 Starting to read stream...')
 
-      return {
-        async *[Symbol.asyncIterator]() {
-          try {
-            while (true) {
-              const { done, value } = await reader.read()
-              
-              if (done) break
-
-              const chunk = decoder.decode(value, { stream: true })
-              const lines = chunk.split('\n')
-
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = line.slice(6)
-                  
-                  if (data === '[DONE]') {
-                    if (accumulatedContent) {
-                      yield {
-                        id: Date.now().toString(),
-                        role: 'assistant' as const,
-                        content: [{ type: 'text' as const, text: accumulatedContent }],
-                        createdAt: new Date(),
-                      }
-                    }
-                    return
-                  }
-                  
-                  if (data && !data.startsWith('Error:')) {
-                    accumulatedContent += data
-                  }
-                }
-              }
-            }
-          } finally {
-            reader.releaseLock()
+      console.log('🎯 About to start yielding directly...')
+      console.log('🎬 Starting async iterator...')
+      let chunkCount = 0
+      while (true) {
+        console.log(`⏳ About to read chunk #${chunkCount + 1}...`)
+        
+        // Add timeout to detect hanging reads
+        const readPromise = reader.read()
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Read timeout after 10 seconds')), 10000)
+        )
+        
+        let done: boolean, value: Uint8Array | undefined
+        try {
+          const result = await Promise.race([readPromise, timeoutPromise])
+          done = result.done
+          value = result.value
+          chunkCount++
+          console.log('📖 Read chunk:', { chunkNumber: chunkCount, done, valueLength: value?.length, hasValue: !!value })
+        } catch (error: any) {
+          console.error('⚠️ Read error or timeout:', error)
+          if (error.message.includes('timeout')) {
+            console.log('🕐 The stream appears to be hanging. Your backend might not be sending data.')
+            break
           }
-        },
+          throw error
+        }
+        
+        if (done) {
+          console.log('✅ Stream finished')
+          break
+        }
+
+        const chunk = decoder.decode(value, { stream: true })
+        console.log('🔤 Decoded chunk:', JSON.stringify(chunk))
+        // Handle Server-Sent Events format with double newlines
+        const lines = chunk.split('\n').filter(line => line.trim() !== '')
+        console.log('📝 Split into lines:', lines)
+
+        for (const line of lines) {
+          console.log('🔍 Processing line:', line)
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6)
+            console.log('📊 Extracted data:', data)
+            
+            if (data === '[DONE]') {
+              console.log('🏁 Received [DONE] signal')
+              return
+            }
+            
+            if (data && !data.startsWith('Error:')) {
+              accumulatedContent += data
+              console.log('➕ Added to accumulated content. Total length:', accumulatedContent.length)
+              console.log('📤 Yielding ChatModelRunResult with content:', data)
+              yield {
+                content: [{
+                  type: 'text',
+                  text: accumulatedContent
+                }]
+              }
+            } else {
+              console.log('⚠️ Skipped data (empty or error):', data)
+            }
+          } else {
+            console.log('⏭️ Skipped line (not data):', line)
+          }
+        }
       }
-    } catch (error) {
+      console.log('🔒 Releasing reader lock')
+      reader.releaseLock()
+    } catch (error: any) {
       console.error('Error in chat adapter:', error)
       throw error
     }
   }
 }
 
-const SimpleChatComponent: React.FC = () => {
-  const [threadId] = useState(() => `thread_${Date.now()}`)
+const ChatComponent: React.FC = () => {
+  const runtime = useLocalRuntime(new BackendChatAdapter())
   
-  const runtime = useChatRuntime({
-    adapter: new BackendChatAdapter(),
-    threadId,
-  })
-
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ 
-        padding: '1rem', 
-        borderBottom: '1px solid #333', 
-        background: '#1a1a1a',
-        color: 'white'
-      }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Simple Chat Agent</h1>
-        <p style={{ margin: '0.5rem 0 0 0', opacity: 0.7, fontSize: '0.9rem' }}>
-          Powered by LangGraph + Assistant UI
-        </p>
-      </div>
-      
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <AssistantRuntime runtime={runtime}>
-          <div style={{ height: '100%', width: '100%' }}>
-            {/* Chat messages will be rendered here by Assistant UI */}
-            <div 
-              style={{ 
-                height: '100%', 
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                fontFamily: 'Inter, system-ui, sans-serif'
-              }}
-            >
-              {/* Message list */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
-                {runtime.messages.map((message) => (
-                  <div
-                    key={message.id}
-                    style={{
+    <AssistantRuntimeProvider runtime={runtime}>
+      <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ 
+          padding: '1rem', 
+          borderBottom: '1px solid #333', 
+          background: '#1a1a1a',
+          color: 'white'
+        }}>
+          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Simple Chat Agent</h1>
+          <p style={{ margin: '0.5rem 0 0 0', opacity: 0.7, fontSize: '0.9rem' }}>
+            Powered by LangGraph + Assistant UI
+          </p>
+        </div>
+        
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <ThreadPrimitive.Root style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <ThreadPrimitive.Viewport style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+              <ThreadPrimitive.Messages 
+                components={{
+                  UserMessage: () => (
+                    <div style={{
                       marginBottom: '1rem',
                       padding: '0.75rem',
                       borderRadius: '0.5rem',
-                      background: message.role === 'user' ? '#2a2a2a' : '#1a1a1a',
-                      color: 'white',
-                      maxWidth: '70%',
-                      marginLeft: message.role === 'user' ? 'auto' : '0',
-                      marginRight: message.role === 'assistant' ? 'auto' : '0',
-                    }}
-                  >
-                    <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '0.8rem' }}>
-                      {message.role === 'user' ? 'You' : 'Assistant'}
-                    </div>
-                    <div style={{ lineHeight: '1.5' }}>
-                      {message.content.map((part, index) => {
-                        if (part.type === 'text') {
-                          return (
-                            <MarkdownText key={index}>
-                              {part.text}
-                            </MarkdownText>
-                          )
-                        }
-                        return null
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Input area */}
-              <div style={{ 
-                borderTop: '1px solid #333', 
-                padding: '1rem',
-                background: '#1a1a1a'
-              }}>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    placeholder="Type your message..."
-                    style={{
-                      flex: 1,
-                      padding: '0.75rem',
-                      border: '1px solid #333',
-                      borderRadius: '0.5rem',
                       background: '#2a2a2a',
                       color: 'white',
-                      fontSize: '1rem',
-                    }}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        const input = e.currentTarget
-                        const message = input.value.trim()
-                        if (message) {
-                          runtime.append({
-                            role: 'user',
-                            content: [{ type: 'text', text: message }],
-                          })
-                          input.value = ''
-                        }
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      const input = document.querySelector('input') as HTMLInputElement
-                      const message = input?.value.trim()
-                      if (message) {
-                        runtime.append({
-                          role: 'user',
-                          content: [{ type: 'text', text: message }],
-                        })
-                        input.value = ''
-                      }
-                    }}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      border: 'none',
+                      maxWidth: '70%',
+                      marginLeft: 'auto',
+                    }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '0.8rem' }}>
+                        You
+                      </div>
+                      <MessagePrimitive.Content />
+                    </div>
+                  ),
+                  AssistantMessage: () => (
+                    <div style={{
+                      marginBottom: '1rem',
+                      padding: '0.75rem',
                       borderRadius: '0.5rem',
-                      background: '#007acc',
+                      background: '#1a1a1a',
                       color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '1rem',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
+                      maxWidth: '70%',
+                      marginRight: 'auto',
+                    }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '0.8rem' }}>
+                        Assistant
+                      </div>
+                      <MessagePrimitive.Content />
+                    </div>
+                  ),
+                }}
+              />
+            </ThreadPrimitive.Viewport>
+            <div style={{ padding: '1rem', borderTop: '1px solid #333', background: '#1a1a1a' }}>
+              <ComposerPrimitive.Root>
+                <ComposerPrimitive.Input
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #333',
+                    borderRadius: '0.5rem',
+                    background: '#2a2a2a',
+                    color: 'white',
+                    fontSize: '1rem',
+                    resize: 'none',
+                  }}
+                  placeholder="Type your message..."
+                />
+                <ComposerPrimitive.Send
+                  style={{
+                    marginTop: '0.5rem',
+                    padding: '0.75rem 1.5rem',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    background: '#007acc',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Send
+                </ComposerPrimitive.Send>
+              </ComposerPrimitive.Root>
             </div>
-          </div>
-        </AssistantRuntime>
+          </ThreadPrimitive.Root>
+        </div>
       </div>
-    </div>
+    </AssistantRuntimeProvider>
   )
 }
 
+
+
 const App: React.FC = () => {
-  return <SimpleChatComponent />
+  return <ChatComponent />
 }
 
 export default App
