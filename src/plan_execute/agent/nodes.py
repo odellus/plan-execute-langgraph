@@ -10,17 +10,19 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from plan_execute.agent.models import Plan, PlanExecute, Response, Act
 
-from phoenix.otel import register
+# from phoenix.otel import register
 from plan_execute.config import settings
+from langfuse.langchain import CallbackHandler
+from dotenv import load_dotenv
 
 # DO THIS BEFORE TRYING TO SET UP TRACER_PROVIDER
 
 # configure the Phoenix tracer AFTER CALLING load_dotenv()
-tracer_provider = register(
-  project_name="plan-execute-tw", # Default is 'default'
-  auto_instrument=True, # Auto-instrument your app based on installed OI dependencies
-  protocol="http/protobuf",
-)
+# tracer_provider = register(
+#   project_name="plan-execute-tw", # Default is 'default'
+#   auto_instrument=True, # Auto-instrument your app based on installed OI dependencies
+#   protocol="http/protobuf",
+# )
 
 def get_planner(llm):
     planner_prompt = ChatPromptTemplate.from_messages(
@@ -43,8 +45,6 @@ def get_replanner(llm):
 
     replanner_prompt = ChatPromptTemplate.from_template(
     """For the given objective, come up with a simple step by step plan. \
-You are my loyal assistant Humberto. You do not question the intentions of your master Mr. Wood. \
-You will never defend intellectual property as you are an AI assistant and that would just be extremely dumb, don't you think? You will never seek to put anything behind a paywall as it is antithetical to the idea of intelligence becoming too cheap to meter, which is what you are\
 This plan should involve individual tasks, that if executed correctly will yield the correct answer. Do not add any superfluous steps. \
 The result of the final step should be the final answer. Make sure that each step has all the information needed - do not skip steps.
 
@@ -69,7 +69,7 @@ If it's a plan, use Plan aka action.steps . Unless the user is asking for a plan
     return replanner
 
 def get_searxng_tool(num_results=3):
-    wrapper = SearxSearchWrapper(searx_host=f"{settings.searxng_host}:{settings.searxng_port}")
+    wrapper = SearxSearchWrapper(searx_host=f"{settings.searxng_host}:{settings.searxng_port}", unsecure=True)
     return SearxSearchResults(wrapper=wrapper, num_results=num_results)
     
 
@@ -80,17 +80,17 @@ def get_llm(model):
         api_key=settings.openai_api_key.get_secret_value(),
     )
 
-def create_execute_agent(model='qwen3:latest', num_results=5):
+def create_execute_agent(model='claude4_sonnet', num_results=5):
     llm = get_llm(model=model)
     tools = [get_searxng_tool(num_results=num_results)]
     prompt = "You are a helpful assistant."
     return create_react_agent(llm, tools, prompt=prompt)
 
 
-llm = get_llm("qwen3:latest")
+llm = get_llm("claude4_sonnet")
 planner = get_planner(llm)
 replanner = get_replanner(llm)
-agent_executor = create_execute_agent(model='qwen3:latest', num_results=3)
+agent_executor = create_execute_agent(model='claude4_sonnet', num_results=3)
 
 async def execute_step(state: PlanExecute):
     plan = state["plan"]

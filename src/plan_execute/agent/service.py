@@ -11,7 +11,11 @@ from plan_execute.agent.nodes import plan_step, execute_step, replan_step
 
 logger = logging.getLogger("service")
 
-
+from dotenv import load_dotenv
+from langfuse.langchain import CallbackHandler
+ 
+# Initialize Langfuse CallbackHandler for Langchain (tracing)
+langfuse_handler = CallbackHandler()
 class PlanExecuteService:
     """
     Thin wrapper that owns the compiled LangGraph and the checkpointer
@@ -50,7 +54,12 @@ class PlanExecuteService:
         """
         logger.info("Processing thread_id=%s message=%r", req.thread_id, req.message)
 
-        config = {"recursion_limit": 50, "configurable": {"thread_id": req.thread_id}}
+        config = {
+            "recursion_limit": 50, 
+            "configurable": {"thread_id": req.thread_id}, 
+            "callbacks": [langfuse_handler], 
+            "metadata": {"langfuse_session_id": req.thread_id}
+        }
         inputs: Dict[str, str] = {"input": req.message}
 
         final_state: Dict[str, Any] | None = None

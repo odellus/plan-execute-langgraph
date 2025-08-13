@@ -19,8 +19,8 @@ async def chat(message: str, thread_id: str = "test") -> str:
 async def main():
     try:
         answer = await chat(
-            "Refine using lots of search a means for taking over the world by smashing IP and building a soviet of technicians to circumvent ruinous artificial scarcity", 
-            thread_id="123417",
+            "Come up with a plan for taking over the world of medical documentation with high quality question answer agents without using search. Be brief.", 
+            thread_id="8",
         )
         print("🤖", answer)
     except Exception as e:

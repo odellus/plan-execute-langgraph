@@ -13,8 +13,13 @@ from langchain_core.messages import HumanMessage, AIMessage
 from plan_execute.agent.models import ChatRequest
 from plan_execute.config import settings
 
-logger = logging.getLogger("simple_service")
+from langfuse.langchain import CallbackHandler
+from dotenv import load_dotenv
 
+load_dotenv()
+
+logger = logging.getLogger("simple_service")
+langfuse_handler = CallbackHandler()
 
 class SimpleChatState(TypedDict):
     messages: list
@@ -74,7 +79,7 @@ class SimpleAgentService:
             # Generate response - collect all chunks into complete response
             chain = prompt | self.llm
             full_response = ""
-            async for chunk in chain.astream({"input": last_message.content}):
+            async for chunk in chain.astream({"input": last_message.content}, config=dict(callbacks=[langfuse_handler])):
                 if chunk.content:
                     full_response += chunk.content
             
@@ -107,7 +112,7 @@ class SimpleAgentService:
             # Stream directly from the LLM, bypassing LangGraph for streaming
             chain = prompt | self.llm
             
-            async for chunk in chain.astream({"input": req.message}):
+            async for chunk in chain.astream({"input": req.message}, config=dict(callbacks=[langfuse_handler])):
                 if chunk.content:
                     # Yield each chunk as it arrives
                     yield f"data: {chunk.content}\n\n"
