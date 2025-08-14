@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from psycopg_pool import AsyncConnectionPool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -44,6 +45,15 @@ async def lifespan(app: FastAPI):
 # ------------------------------------------------------------------
 app = FastAPI(lifespan=lifespan)
 
+# Add CORS middleware to allow requests from the frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for now to debug
+    allow_credentials=False,  # Set to False when using allow_origins=["*"]
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
 
 # ------------------------------------------------------------------
 # Original Plan-Execute Endpoint
@@ -64,6 +74,12 @@ async def chat(req: ChatRequest) -> ChatResponse:
 # ------------------------------------------------------------------
 from fastapi.responses import StreamingResponse
 
+@app.options("/simple-chat-stream")
+async def simple_chat_stream_options():
+    """Handle CORS preflight for simple-chat-stream"""
+    logger.info("OPTIONS request received for /simple-chat-stream")
+    return {"message": "OK"}
+
 @app.post("/simple-chat-stream")
 async def simple_chat_stream(req: ChatRequest):
     """
@@ -78,8 +94,6 @@ async def simple_chat_stream(req: ChatRequest):
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "*",
             }
         )
     except Exception as exc:

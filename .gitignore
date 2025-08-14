@@ -10,3 +10,4 @@ wheels/
 .venv
 .env
 postgres
+frontend/node_modules
