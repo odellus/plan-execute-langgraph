@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -17,6 +18,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { MyRuntimeProvider } from "./runtime-provider";
+import Link from "next/link";
+import { Palette } from "lucide-react";
 
 export const Assistant = () => {
   return (
@@ -41,6 +44,14 @@ export const Assistant = () => {
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
+              <div className="ml-auto">
+                <Link href="/canvas">
+                  <Button variant="outline" size="sm">
+                    <Palette className="h-4 w-4 mr-2" />
+                    Canvas
+                  </Button>
+                </Link>
+              </div>
             </header>
             <div className="flex-1 overflow-hidden">
               <Thread />

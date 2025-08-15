@@ -1,0 +1,1 @@
+# Canvas module for artifact-based interactions

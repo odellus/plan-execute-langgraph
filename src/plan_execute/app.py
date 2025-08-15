@@ -12,6 +12,8 @@ from plan_execute.config import settings
 from plan_execute.agent.models import ChatRequest, ChatResponse
 from plan_execute.agent.service import PlanExecuteService
 from plan_execute.agent.simple_service import SimpleAgentService
+from plan_execute.canvas.models import CanvasChatRequest, CanvasChatResponse
+from plan_execute.canvas.service import CanvasService
 
 import logging
 logging.basicConfig(
@@ -27,15 +29,18 @@ db_uri = settings.postgres_dsn
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with AsyncConnectionPool(db_uri, open=False) as pool:
-        # Initialize both services
+        # Initialize all services
         plan_execute_service = PlanExecuteService(pool)
         simple_agent_service = SimpleAgentService(pool)
+        canvas_service = CanvasService(pool)
         
         await plan_execute_service.initialize()
         await simple_agent_service.initialize()
+        await canvas_service.initialize()
         
         app.state.plan_execute_executor = plan_execute_service
         app.state.simple_agent_executor = simple_agent_service
+        app.state.canvas_service = canvas_service
         
         yield
     # pool closed automatically on exit
@@ -117,6 +122,23 @@ async def simple_chat(req: ChatRequest) -> ChatResponse:
     except Exception as exc:
         detail = traceback.format_exc()
         logger.exception("simple chat endpoint failed")
+        raise HTTPException(status_code=500, detail=detail)
+
+
+# ------------------------------------------------------------------
+# Canvas Endpoints
+# ------------------------------------------------------------------
+@app.post("/canvas/chat", response_model=CanvasChatResponse)
+async def canvas_chat(req: CanvasChatRequest) -> CanvasChatResponse:
+    """
+    Canvas chat endpoint for artifact-based interactions.
+    """
+    service: CanvasService = app.state.canvas_service
+    try:
+        return await service.chat(req)
+    except Exception as exc:
+        detail = traceback.format_exc()
+        logger.exception("canvas chat endpoint failed")
         raise HTTPException(status_code=500, detail=detail)
 
 
