@@ -3,7 +3,7 @@
 import "@assistant-ui/react-markdown/styles/dot.css";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-
+import { SyntaxHighlighter } from "./shiki-highlighter";
 import {
   CodeHeaderProps,
   MarkdownTextPrimitive,
@@ -68,6 +68,7 @@ const useCopyToClipboard = ({
 };
 
 const defaultComponents = memoizeMarkdownComponents({
+  SyntaxHighlighter: SyntaxHighlighter,
   h1: ({ className, ...props }) => (
     <h1 className={cn("mb-8 scroll-m-20 text-4xl font-extrabold tracking-tight last:mb-0", className)} {...props} />
   ),
