@@ -12,7 +12,7 @@ from plan_execute.config import settings
 from plan_execute.agent.models import ChatRequest, ChatResponse
 from plan_execute.agent.service import PlanExecuteService
 from plan_execute.agent.simple_service import SimpleAgentService
-from plan_execute.agent.dspy_service import DSPyAgentService  # Import DSPy service
+from plan_execute.agent.dspy_service import DSPyAgentService  # Import enhanced DSPy service with MCP
 from plan_execute.canvas.models import CanvasChatRequest, CanvasChatResponse
 from plan_execute.canvas.service import CanvasService
 from dotenv import load_dotenv
@@ -36,17 +36,17 @@ async def lifespan(app: FastAPI):
         # Initialize all services
         plan_execute_service = PlanExecuteService(pool)
         # simple_agent_service = SimpleAgentService(pool)  # Replaced with DSPy
-        dspy_agent_service = DSPyAgentService(pool)  # New DSPy service
+        dspy_agent_service = DSPyAgentService(pool)  # Enhanced DSPy service with MCP tools
         canvas_service = CanvasService(pool)
         
         await plan_execute_service.initialize()
         # await simple_agent_service.initialize()  # Replaced with DSPy
-        await dspy_agent_service.initialize()  # Initialize DSPy service
+        await dspy_agent_service.initialize()  # Initialize DSPy service with MCP tools
         await canvas_service.initialize()
         
         app.state.plan_execute_executor = plan_execute_service
         # app.state.simple_agent_executor = simple_agent_service  # Replaced with DSPy
-        app.state.simple_agent_executor = dspy_agent_service  # Use DSPy service
+        app.state.simple_agent_executor = dspy_agent_service  # Use enhanced DSPy service with MCP tools
         app.state.canvas_service = canvas_service
         
         yield
@@ -95,7 +95,8 @@ async def simple_chat_stream_options():
 @app.post("/simple-chat-stream")
 async def simple_chat_stream(req: ChatRequest):
     """
-    Streaming endpoint for the DSPy-based agent.
+    Streaming endpoint for the DSPy-based agent with MCP tools.
+    Supports airline booking, flight search, and general conversation.
     Returns Server-Sent Events (SSE) format.
     """
     service: DSPyAgentService = app.state.simple_agent_executor  # Now using DSPy service
@@ -120,7 +121,8 @@ async def simple_chat_stream(req: ChatRequest):
 @app.post("/simple-chat", response_model=ChatResponse)
 async def simple_chat(req: ChatRequest) -> ChatResponse:
     """
-    Non-streaming endpoint for the DSPy-based agent.
+    Non-streaming endpoint for the DSPy-based agent with MCP tools.
+    Supports airline booking, flight search, and general conversation.
     """
     service: DSPyAgentService = app.state.simple_agent_executor  # Now using DSPy service
     try:
