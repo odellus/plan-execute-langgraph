@@ -44,17 +44,17 @@ async def test_simple_chat_with_mcp():
             },
             {
                 "name": "Flight Search",
-                "message": "Can you help me find flights from SFO to JFK on September 1st, 2025?",
+                "message": "Can you help me find flights from SFO to Boston on December 19th, 2024?",
                 "thread_id": "test-flight-search"
             },
             {
                 "name": "Flight Booking",
-                "message": "Please book the cheapest flight from SFO to JFK on September 1st, 2025 for Adam.",
+                "message": "Please book the cheapest flight from SFO to Boston on December 19th, 2024 for Adam.",
                 "thread_id": "test-booking"
             },
             {
                 "name": "Mixed Conversation",
-                "message": "Hi! I'm planning a trip. Can you tell me what flights are available from LAX to JFK on September 1st?",
+                "message": "Hi! I'm planning a trip. Can you tell me what flights are available from LAX to JFK on September 1st, 2025?",
                 "thread_id": "test-mixed"
             }
         ]

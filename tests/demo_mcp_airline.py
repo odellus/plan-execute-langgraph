@@ -7,7 +7,7 @@ import asyncio
 import logging
 from psycopg_pool import AsyncConnectionPool
 
-from src.plan_execute.agent.dspy_mcp_service import DSPyMCPAgentService
+from src.plan_execute.agent.dspy_service import DSPyAgentService
 from src.plan_execute.agent.models import ChatRequest
 from src.plan_execute.config import settings
 
@@ -26,20 +26,20 @@ async def demo_airline_booking():
     # Create connection pool
     db_uri = settings.postgres_dsn
     async with AsyncConnectionPool(db_uri, open=False, kwargs=dict(autocommit=True)) as pool:
-        # Initialize the MCP service
-        service = DSPyMCPAgentService(pool)
+        # Initialize the enhanced DSPy service
+        service = DSPyAgentService(pool)
         await service.initialize()
-        logger.info("✓ DSPy MCP service initialized")
+        logger.info("✓ Enhanced DSPy service initialized")
         
         # Demo scenarios
         scenarios = [
             {
                 "name": "Flight Search",
-                "message": "I'm looking for flights from SFO to JFK on September 1st, 2025. Can you show me what's available?"
+                "message": "I'm looking for flights from SFO to Boston on December 19th, 2024. Can you show me what's available?"
             },
             {
                 "name": "Flight Booking",
-                "message": "Please book the cheapest flight from SFO to JFK on September 1st, 2025 for Adam."
+                "message": "Please book the cheapest flight from SFO to Boston on December 19th, 2024 for Adam."
             },
             {
                 "name": "Itinerary Check",
@@ -97,8 +97,8 @@ async def demo_streaming():
     # Create connection pool
     db_uri = settings.postgres_dsn
     async with AsyncConnectionPool(db_uri, open=False, kwargs=dict(autocommit=True)) as pool:
-        # Initialize the MCP service
-        service = DSPyMCPAgentService(pool)
+        # Initialize the enhanced DSPy service
+        service = DSPyAgentService(pool)
         await service.initialize()
         
         # Stream a complex booking request

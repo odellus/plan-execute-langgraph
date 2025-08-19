@@ -1,8 +1,13 @@
 import random
 import string
+import logging
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
+
+# Configure logging for the MCP server
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("mcp_server")
 
 # Create an MCP server
 mcp = FastMCP("Airline Agent")
@@ -114,6 +119,31 @@ flight_database = {
         duration=6,
         price=325,
     ),
+    # Add Boston flights for testing
+    "DA201": Flight(
+        flight_id="DA201",
+        origin="SFO",
+        destination="BOS",
+        date_time=Date(year=2024, month=12, day=19, hour=14),
+        duration=5.5,
+        price=350,
+    ),
+    "DA203": Flight(
+        flight_id="DA203",
+        origin="SFO",
+        destination="BOS",
+        date_time=Date(year=2024, month=12, day=19, hour=18),
+        duration=5.5,
+        price=420,
+    ),
+    "DA205": Flight(
+        flight_id="DA205",
+        origin="SFO",
+        destination="BOS",
+        date_time=Date(year=2024, month=12, day=20, hour=8),
+        duration=5.5,
+        price=380,
+    ),
 }
 
 itinerary_database = {}  # Will be populated as bookings are made
@@ -122,8 +152,9 @@ itinerary_database = {}  # Will be populated as bookings are made
 @mcp.tool()
 def fetch_flight_info(date: Date, origin: str, destination: str):
     """Fetch flight information from origin to destination on the given date"""
+    logger.info(f"🔍 Searching flights: {origin} → {destination} on {date.year}-{date.month:02d}-{date.day:02d}")
+    
     flights = []
-
     for flight_id, flight in flight_database.items():
         if (
             flight.date_time.year == date.year
@@ -133,25 +164,36 @@ def fetch_flight_info(date: Date, origin: str, destination: str):
             and flight.destination == destination
         ):
             flights.append(flight)
+    
+    logger.info(f"✈️ Found {len(flights)} flights matching criteria")
     return flights
 
 
 @mcp.tool()
 def fetch_itinerary(confirmation_number: str):
     """Fetch itinerary information using confirmation number"""
+    logger.info(f"🎫 Looking up itinerary: {confirmation_number}")
+    
     if confirmation_number in itinerary_database:
-        return itinerary_database[confirmation_number]
+        itinerary = itinerary_database[confirmation_number]
+        logger.info(f"✅ Found itinerary for {itinerary.user_profile.name}")
+        return itinerary
     else:
+        logger.warning(f"❌ Itinerary not found: {confirmation_number}")
         return None
 
 
 @mcp.tool()
 def book_itinerary(user_name: str, flight_id: str):
     """Book a flight for a user"""
+    logger.info(f"📝 Booking flight {flight_id} for {user_name}")
+    
     if user_name not in user_database:
+        logger.error(f"❌ User not found: {user_name}")
         return f"User {user_name} not found in database"
 
     if flight_id not in flight_database:
+        logger.error(f"❌ Flight not found: {flight_id}")
         return f"Flight {flight_id} not found"
 
     user_profile = user_database[user_name]
@@ -169,46 +211,63 @@ def book_itinerary(user_name: str, flight_id: str):
 
     # Store in database
     itinerary_database[confirmation_number] = itinerary
-
+    
+    logger.info(f"✅ Successfully booked flight {flight_id} for {user_name}, confirmation: {confirmation_number}")
     return itinerary
 
 
 @mcp.tool()
 def modify_itinerary(confirmation_number: str, new_flight_id: str = None, cancel: bool = False):
     """Modify an existing itinerary - either change flight or cancel"""
+    logger.info(f"✏️ Modifying itinerary {confirmation_number}, cancel={cancel}, new_flight={new_flight_id}")
+    
     if confirmation_number not in itinerary_database:
+        logger.error(f"❌ Confirmation number not found: {confirmation_number}")
         return f"Confirmation number {confirmation_number} not found"
 
     if cancel:
         # Cancel the booking
         cancelled_itinerary = itinerary_database.pop(confirmation_number)
+        logger.info(f"🗑️ Cancelled booking {confirmation_number} for {cancelled_itinerary.user_profile.name}")
         return f"Booking {confirmation_number} has been cancelled"
 
     if new_flight_id:
         if new_flight_id not in flight_database:
+            logger.error(f"❌ New flight not found: {new_flight_id}")
             return f"Flight {new_flight_id} not found"
 
         # Update the flight
         itinerary = itinerary_database[confirmation_number]
+        old_flight = itinerary.flight.flight_id
         itinerary.flight = flight_database[new_flight_id]
+        logger.info(f"🔄 Updated itinerary {confirmation_number}: {old_flight} → {new_flight_id}")
         return itinerary
 
+    logger.warning(f"⚠️ No modification specified for {confirmation_number}")
     return "No modification specified"
 
 
 @mcp.tool()
 def get_user_info(user_name: str):
     """Get user profile information"""
+    logger.info(f"👤 Looking up user: {user_name}")
+    
     if user_name in user_database:
-        return user_database[user_name]
+        user = user_database[user_name]
+        logger.info(f"✅ Found user: {user.name} ({user.email})")
+        return user
     else:
+        logger.warning(f"❌ User not found: {user_name}")
         return f"User {user_name} not found"
 
 
 @mcp.tool()
 def file_ticket(user_name: str, user_request: str):
     """File a support ticket for complex requests that need human assistance"""
+    logger.info(f"🎟️ Filing support ticket for {user_name}")
+    
     if user_name not in user_database:
+        logger.error(f"❌ User not found: {user_name}")
         return f"User {user_name} not found in database"
 
     user_profile = user_database[user_name]
@@ -217,8 +276,10 @@ def file_ticket(user_name: str, user_request: str):
     # In a real system, this would be stored in a ticketing system
     ticket_id = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
     
+    logger.info(f"✅ Created support ticket {ticket_id} for {user_name}")
     return f"Support ticket {ticket_id} has been created for {user_name}. A human agent will contact you at {user_profile.email} within 24 hours."
 
 
 if __name__ == "__main__":
+    logger.info("🚀 Starting MCP Airline Server...")
     mcp.run()

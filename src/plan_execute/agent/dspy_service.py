@@ -45,9 +45,12 @@ class DSPyAgentService:
         self.checkpointer = DSPyConversationCheckpointer(pool)
         self.pool = pool
         
-        # MCP server configuration
-        self.mcp_server_path = mcp_server_path or "/Users/thomas.wood/src/plan-execute-langgraph/mcp_server.py"
+        # MCP server configuration - co-locate with this service
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.mcp_server_path = mcp_server_path or os.path.join(current_dir, "mcp_server.py")
         self.mcp_tools = []
+        self.mcp_session = None  # Keep session alive for tool calls
         
         # Configure DSPy with the same LLM settings as the original service
         self.lm = self._configure_dspy_lm()
@@ -79,40 +82,97 @@ class DSPyAgentService:
                 logger.error(f"Failed to configure DSPy LM: {e2}")
                 raise Exception(f"Could not configure DSPy LM: {e2}")
 
+    async def _create_mcp_tool_wrapper(self, tool_name: str, tool_description: str, tool_func):
+        """Create a DSPy tool wrapper for MCP tools."""
+        
+        class MCPToolWrapper(dspy.Tool):
+            def __init__(self, name: str, description: str, func):
+                self.name = name
+                self.description = description
+                self.func = func
+                
+            async def acall(self, **kwargs):
+                """Async call to MCP tool."""
+                logger.info(f"🛠️ Calling MCP tool: {self.name} with args: {kwargs}")
+                try:
+                    result = await self.func(**kwargs)
+                    logger.info(f"✅ MCP tool {self.name} completed successfully")
+                    logger.debug(f"Tool result: {result}")
+                    return result
+                except Exception as e:
+                    logger.error(f"❌ MCP tool {self.name} failed: {e}")
+                    raise
+                    
+            def __call__(self, **kwargs):
+                """Sync call - not supported for MCP tools."""
+                raise NotImplementedError("MCP tools only support async calls. Use acall() instead.")
+        
+        return MCPToolWrapper(tool_name, tool_description, tool_func)
+
     async def _initialize_mcp_tools(self) -> List[dspy.Tool]:
         """Initialize MCP tools by connecting to the MCP server."""
+        logger.info(f"🔧 Initializing MCP tools from server: {self.mcp_server_path}")
+        
         try:
             from mcp import ClientSession, StdioServerParameters
             from mcp.client.stdio import stdio_client
             
-            server_params = StdioServerParameters(
+            # Check if MCP server file exists
+            import os
+            if not os.path.exists(self.mcp_server_path):
+                logger.warning(f"⚠️ MCP server file not found: {self.mcp_server_path}")
+                return []
+            
+            # Create persistent connection parameters
+            self.mcp_server_params = StdioServerParameters(
                 command="python",
                 args=[self.mcp_server_path],
                 env=None,
             )
             
-            async with stdio_client(server_params) as (read, write):
+            logger.info("🚀 Testing MCP server connection...")
+            async with stdio_client(self.mcp_server_params) as (read, write):
                 async with ClientSession(read, write) as session:
                     # Initialize the connection
+                    logger.info("🤝 Initializing MCP session...")
                     await session.initialize()
                     
                     # List available tools
+                    logger.info("📋 Listing available MCP tools...")
                     tools = await session.list_tools()
                     
-                    # Convert MCP tools to DSPy tools
+                    # Create tool wrappers that can create their own sessions
                     dspy_tools = []
                     for tool in tools.tools:
-                        dspy_tool = dspy.Tool.from_mcp_tool(session, tool)
-                        dspy_tools.append(dspy_tool)
+                        logger.info(f"🛠️ Creating wrapper for MCP tool: {tool.name} - {tool.description}")
+                        
+                        # Create a closure that captures the tool info
+                        async def create_tool_func(tool_name=tool.name):
+                            async def tool_func(**kwargs):
+                                # Create a new session for each tool call
+                                async with stdio_client(self.mcp_server_params) as (read, write):
+                                    async with ClientSession(read, write) as session:
+                                        await session.initialize()
+                                        result = await session.call_tool(tool_name, kwargs)
+                                        return result.content
+                            return tool_func
+                        
+                        tool_func = await create_tool_func(tool.name)
+                        tool_wrapper = await self._create_mcp_tool_wrapper(tool.name, tool.description, tool_func)
+                        dspy_tools.append(tool_wrapper)
                     
-                    logger.info(f"Successfully initialized {len(dspy_tools)} MCP tools")
+                    logger.info(f"✅ Successfully initialized {len(dspy_tools)} MCP tools")
+                    for tool in dspy_tools:
+                        logger.info(f"  • {tool.name}: {tool.description}")
+                    
                     return dspy_tools
                     
-        except ImportError:
-            logger.warning("MCP not available - continuing without tools")
+        except ImportError as e:
+            logger.warning(f"📦 MCP packages not available: {e} - continuing without tools")
             return []
         except Exception as e:
-            logger.warning(f"Failed to initialize MCP tools: {e} - continuing without tools")
+            logger.error(f"❌ Failed to initialize MCP tools: {e} - continuing without tools")
+            logger.debug("Full MCP initialization error:", exc_info=True)
             return []
 
     async def initialize(self) -> None:
@@ -126,10 +186,12 @@ class DSPyAgentService:
             
             # Create the chat predictor (with or without tools)
             if self.mcp_tools:
-                logger.info(f"Creating ReAct agent with {len(self.mcp_tools)} MCP tools")
+                logger.info(f"🤖 Creating ReAct agent with {len(self.mcp_tools)} MCP tools")
+                tool_names = [tool.name for tool in self.mcp_tools]
+                logger.info(f"🛠️ Available tools: {', '.join(tool_names)}")
                 self.chat_predictor = dspy.ReAct(ConversationSignature, tools=self.mcp_tools)
             else:
-                logger.info("Creating basic Predict agent (no MCP tools available)")
+                logger.info("💬 Creating basic Predict agent (no MCP tools available)")
                 self.chat_predictor = dspy.Predict(ConversationSignature)
             
             # Create streaming version
@@ -152,7 +214,13 @@ class DSPyAgentService:
         :param req: validated request model
         :yields: chunks of the response as they're generated
         """
-        logger.info("Processing DSPy streaming chat for thread_id=%s message=%r", req.thread_id, req.message)
+        logger.info("🚀 Processing DSPy streaming chat for thread_id=%s message=%r", req.thread_id, req.message)
+        
+        # Log tool availability
+        if self.mcp_tools:
+            logger.info(f"🛠️ Tools available for this request: {len(self.mcp_tools)} MCP tools")
+        else:
+            logger.info("💬 No tools available - using basic conversation mode")
         
         # Validate message
         if not req.message or not req.message.strip():
@@ -193,12 +261,14 @@ class DSPyAgentService:
             
             # Call the streaming predictor (ReAct or Predict depending on tools)
             if self.mcp_tools:
+                logger.info("🤖 Using ReAct agent with MCP tools for streaming response")
                 # Use ReAct with tools - need to use acall for async tools
                 stream_generator = self.streaming_chat(
                     history=history,
                     user_message=req.message
                 )
             else:
+                logger.info("💬 Using basic Predict for streaming response")
                 # Use basic Predict
                 stream_generator = self.streaming_chat(
                     history=history,
@@ -212,10 +282,19 @@ class DSPyAgentService:
                     # Handle both ReAct (with process_result) and Predict (with response) outputs
                     if hasattr(chunk, 'process_result'):
                         full_response = chunk.process_result
-                        logger.debug(f"Final DSPy ReAct prediction: {chunk.process_result}")
+                        logger.info(f"✅ Final DSPy ReAct prediction completed")
+                        logger.debug(f"ReAct response: {chunk.process_result}")
+                        
+                        # Log tool usage if available in trajectory
+                        if hasattr(chunk, 'trajectory') and chunk.trajectory:
+                            tool_calls = [k for k in chunk.trajectory.keys() if k.startswith('tool_name_')]
+                            if tool_calls:
+                                used_tools = [chunk.trajectory[k] for k in tool_calls]
+                                logger.info(f"🛠️ Tools used in this conversation: {', '.join(used_tools)}")
                     else:
                         full_response = chunk.response
-                        logger.debug(f"Final DSPy prediction: {chunk.response}")
+                        logger.info(f"✅ Final DSPy Predict response completed")
+                        logger.debug(f"Predict response: {chunk.response}")
                 elif hasattr(chunk, 'choices') and chunk.choices:
                     # This is a ModelResponseStream from LiteLLM - extract content
                     delta = chunk.choices[0].delta

@@ -13,7 +13,7 @@ from typing import AsyncGenerator
 import aiohttp
 from psycopg_pool import AsyncConnectionPool
 
-from src.plan_execute.agent.dspy_mcp_service import DSPyMCPAgentService
+from src.plan_execute.agent.dspy_service import DSPyAgentService
 from src.plan_execute.agent.models import ChatRequest
 from src.plan_execute.config import settings
 
@@ -34,10 +34,14 @@ async def test_mcp_server_standalone():
         from mcp.client.stdio import stdio_client
         import dspy
         
-        # Create server parameters
+        # Create server parameters - use the co-located server
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        server_path = os.path.join(os.path.dirname(current_dir), "src", "plan_execute", "agent", "mcp_server.py")
+        
         server_params = StdioServerParameters(
             command="python",
-            args=["/Users/thomas.wood/src/plan-execute-langgraph/mcp_server.py"],
+            args=[server_path],
             env=None,
         )
         
@@ -63,9 +67,9 @@ async def test_mcp_server_standalone():
                 if fetch_flight_tool:
                     logger.info("Testing fetch_flight_info tool...")
                     result = await fetch_flight_tool.acall(
-                        date={"year": 2025, "month": 9, "day": 1, "hour": 0},
+                        date={"year": 2024, "month": 12, "day": 19, "hour": 0},
                         origin="SFO",
-                        destination="JFK"
+                        destination="BOS"
                     )
                     logger.info(f"Flight search result: {result}")
                 
@@ -77,22 +81,22 @@ async def test_mcp_server_standalone():
         return False
 
 
-async def test_dspy_mcp_service():
-    """Test the DSPy MCP service integration."""
-    logger.info("Testing DSPy MCP service integration...")
+async def test_dspy_service_with_mcp():
+    """Test the enhanced DSPy service with MCP integration."""
+    logger.info("Testing enhanced DSPy service with MCP integration...")
     
     try:
         # Create connection pool
         db_uri = settings.postgres_dsn
         async with AsyncConnectionPool(db_uri, open=False, kwargs=dict(autocommit=True)) as pool:
             # Initialize service
-            service = DSPyMCPAgentService(pool)
+            service = DSPyAgentService(pool)
             await service.initialize()
             
             # Test chat request
             request = ChatRequest(
                 thread_id="test-mcp-thread",
-                message="Please help me find flights from SFO to JFK on September 1st, 2025"
+                message="Please help me find flights from SFO to Boston on December 19th, 2024"
             )
             
             logger.info("Testing non-streaming chat...")
@@ -116,11 +120,11 @@ async def test_dspy_mcp_service():
                         except json.JSONDecodeError:
                             pass
             
-            logger.info(f"✓ DSPy MCP service test passed - received {len(stream_chunks)} chunks")
+            logger.info(f"✓ Enhanced DSPy service test passed - received {len(stream_chunks)} chunks")
             return True
             
     except Exception as e:
-        logger.error(f"✗ DSPy MCP service test failed: {e}")
+        logger.error(f"✗ Enhanced DSPy service test failed: {e}")
         import traceback
         logger.error(traceback.format_exc())
         return False
@@ -142,12 +146,12 @@ async def test_api_endpoints():
         # Wait for server to start
         await asyncio.sleep(5)
         
-        # Test the airline chat endpoint
+        # Test the simple chat endpoint (now enhanced with MCP)
         async with aiohttp.ClientSession() as session:
-            url = f"http://{settings.host}:{settings.port}/airline-chat"
+            url = f"http://{settings.host}:{settings.port}/simple-chat"
             payload = {
                 "thread_id": "test-api-thread",
-                "message": "I need to book a flight from SFO to JFK on September 1st, 2025. My name is Adam."
+                "message": "I need to find flights from SFO to Boston on December 19th, 2024."
             }
             
             logger.info(f"Testing POST {url}")
@@ -188,12 +192,12 @@ async def test_streaming_endpoint():
         # Wait for server to start
         await asyncio.sleep(5)
         
-        # Test the airline streaming chat endpoint
+        # Test the simple chat streaming endpoint (now enhanced with MCP)
         async with aiohttp.ClientSession() as session:
-            url = f"http://{settings.host}:{settings.port}/airline-chat-stream"
+            url = f"http://{settings.host}:{settings.port}/simple-chat-stream"
             payload = {
                 "thread_id": "test-stream-thread",
-                "message": "Please help me book a flight from SFO to JFK on September 1st, 2025. My name is Bob."
+                "message": "Please help me book a flight from SFO to Boston on December 19th, 2024 for Bob."
             }
             
             logger.info(f"Testing streaming POST {url}")
@@ -239,7 +243,7 @@ async def main():
     
     tests = [
         ("MCP Server Standalone", test_mcp_server_standalone),
-        ("DSPy MCP Service", test_dspy_mcp_service),
+        ("Enhanced DSPy Service", test_dspy_service_with_mcp),
         ("API Endpoints", test_api_endpoints),
         ("Streaming Endpoint", test_streaming_endpoint),
     ]
