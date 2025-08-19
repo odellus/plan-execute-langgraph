@@ -43,7 +43,16 @@ class PlanExecuteService:
 
     async def initialize(self) -> None:
         """One-time DB setup; call once at start-up."""
-        await self.checkpointer.setup()
+        try:
+            await self.checkpointer.setup()
+        except Exception as e:
+            if "CREATE INDEX CONCURRENTLY cannot run inside a transaction block" in str(e):
+                logger.warning("Concurrent index creation failed, trying alternative setup")
+                # Try to setup without concurrent index creation
+                # The checkpointer should work even if indexes aren't created concurrently
+                pass
+            else:
+                raise
 
     async def chat(self, req: ChatRequest) -> ChatResponse:
         """

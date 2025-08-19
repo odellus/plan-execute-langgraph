@@ -16,6 +16,7 @@ dependencies = [
     "arize-phoenix>=11.18.0",
     "arize-phoenix-otel>=0.12.1",
     "asyncpg>=0.30.0",
+    "dspy-ai>=3.0.1",
     "fastapi>=0.115.0",
     "ipython>=9.4.0",
     "langchain-community>=0.3.27",

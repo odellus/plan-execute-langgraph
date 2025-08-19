@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     port: int = 8094
     # --- secrets & endpoints you actually need --------------------
     postgres_password: SecretStr
-    postgres_url: str = "db"
+    postgres_url: str = "localhost"
     phoenix_api_key: SecretStr
     phoenix_collector_endpoint: str = "http://host.docker.internal:4317"
     # phoenix_collector_http_endpoint: str = "http://host.docker.internal:6006/v1/traces"

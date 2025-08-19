@@ -1,21 +1,25 @@
 # TRAE.md
 
-This is a markdown file intende for trae agent. It contains the instructions for trae-agent to follow.
+This is a markdown file intended for trae agent. It contains the instructions for trae-agent to follow.
 
 # INSTRUCTIONS
-Add a canvas to our frontend using the example given in `./frontend_canvas_example`. Study what they have done there and compare and contrast with our code, then bring the canvas into our UI. 
-
-Update the backend to use a similar structure as the backend in `./js_backend_canvas_example` but continue to use our approach of fastapi over langgraph in python please.
-
-You were doing a great job at this but got confused and started trying to start the postgres with docker compose up -d db but we're using the postgres that langfuse spins up and exposes on 5432 because uh yeah they have the port occupado.
-
-Figure out where you were in completing the task above first step.
-
-Finish it up.
+We want to use DSPy instead of langgraph. Search dspy.ai for solutions to 
+- streaming
+- chat history
+- memory/persistence
+- write your own conversation persistence checkpointer for DSPy
+- do for a single endpoint first
+- try to replace the simple_service.py with DSPy 
+- Should not require modifications to frontend
+- Do not modify frontend I will test after we have a complete DSPy based endpoint that functions in a similar way to simple service
 
 # RULES
-- We use uv, so be sure to source .venv/bin/activate and uv run everything
-- Write tests to ensure what you are doing works
 - Test often
-- Finish soon so I can test it out in UI
-- Think sequentially often
+- we use uv for running python so do uv run instead of python
+- Search the internet for how to do things in DSPy
+- Look to see how we do things with langgraph and base approach in DSPy on that
+
+# LINKS
+- https://dspy.ai/tutorials/conversation_history/
+- https://dspy.ai/tutorials/streaming/
+- https://dspy.ai/tutorials/deployment/

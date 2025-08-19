@@ -54,3 +54,4 @@ export const SyntaxHighlighter: FC<HighlighterProps> = ({
 };
 
 SyntaxHighlighter.displayName = "SyntaxHighlighter";
+

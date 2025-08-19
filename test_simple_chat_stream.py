@@ -23,7 +23,7 @@ def test_simple_chat_stream():
     try:
         # Make the streaming request
         response = requests.post(
-            "http://localhost:8032/simple-chat-stream",
+            "http://localhost:8032/simple-chat-stream",  # Use actual running port
             json=payload,
             headers={
                 "Content-Type": "application/json",
@@ -99,7 +99,7 @@ def test_simple_chat_non_stream():
     
     try:
         response = requests.post(
-            "http://localhost:8032/simple-chat",
+            "http://localhost:8032/simple-chat",  # Use actual running port
             json=payload,
             headers={"Content-Type": "application/json"}
         )
